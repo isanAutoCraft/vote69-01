@@ -1,0 +1,2079 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="description" content="VOTE 2569 — Parallel tally UI (offline-first, client-side only)" />
+<title>VOTE 2569</title>
+<style>
+
+    :root{
+
+      --bg:#0b1220;
+
+      --text:#e5e7eb;
+
+      --muted:#9ca3af;
+
+      --card: rgba(255,255,255,.05);
+
+      --border: rgba(255,255,255,.10);
+
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+
+      --radius: 18px;
+
+      --gap: 10px;
+
+      /* grid columns (shared by number grid + special row to keep same tile size) */
+
+      --cols: 3;
+
+      /* active ballot accent */
+
+      --accent:#22c55e;
+
+      --accentSoft: rgba(34,197,94,.16);
+
+      --accentBorder: rgba(34,197,94,.35);
+
+      --headerGlow1: rgba(34,197,94,.15);
+
+      --headerGlow2: rgba(59,130,246,.10);
+
+      /* form */
+
+      --fieldBg: rgba(255,255,255,.10);
+
+      --fieldBorder: rgba(255,255,255,.22);
+
+      --fieldText: #f3f4f6;
+
+      --fieldTextMuted: rgba(243,244,246,.75);
+
+      /* special colors */
+
+      --yellow: #eab308;
+
+      --yellowSoft: rgba(234,179,8,.18);
+
+      --yellowBorder: rgba(234,179,8,.35);
+
+      --red: #ef4444;
+
+      --redSoft: rgba(239,68,68,.18);
+
+      --redBorder: rgba(239,68,68,.35);
+
+    }
+
+    *{ box-sizing:border-box; }
+
+    body{
+
+      margin:0;
+
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif;
+
+      color:var(--text);
+
+      background:
+
+        radial-gradient(1200px 700px at 20% -10%, var(--headerGlow1), transparent),
+
+        radial-gradient(900px 600px at 120% 10%, var(--headerGlow2), transparent),
+
+        var(--bg);
+
+    }
+
+    header{
+
+      position: sticky; top:0; z-index:10;
+
+      padding: 14px 14px 10px;
+
+      background: rgba(11,18,32,.86);
+
+      backdrop-filter: blur(10px);
+
+      border-bottom: 1px solid rgba(255,255,255,.06);
+
+    }
+
+    .brand{ display:flex; flex-direction:column; gap:10px; width: 100%; }
+
+    .brandTop{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+
+    .brand h1{ margin:0; font-size: 18px; letter-spacing: .6px; }
+
+    .actions{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+
+    .seg{
+
+      display:flex; gap:6px;
+
+      padding: 6px;
+
+      border-radius: 999px;
+
+      background: rgba(255,255,255,.06);
+
+      border: 1px solid rgba(255,255,255,.08);
+
+    }
+
+    .seg button{
+
+      padding: 8px 10px;
+
+      border-radius: 999px;
+
+      border: 1px solid transparent;
+
+      background: transparent;
+
+      color: var(--muted);
+
+      font-size: 13px;
+
+      cursor:pointer;
+
+      -webkit-tap-highlight-color: transparent;
+
+    }
+
+    .seg button.active{
+
+      background: var(--accentSoft);
+
+      border-color: var(--accentBorder);
+
+      color: var(--text);
+
+    }
+
+    button{
+
+      border:1px solid rgba(255,255,255,.10);
+
+      background: rgba(255,255,255,.06);
+
+      color: var(--text);
+
+      padding:10px 12px;
+
+      border-radius: 14px;
+
+      cursor:pointer;
+
+      font-size: 14px;
+
+      -webkit-tap-highlight-color: transparent;
+
+    }
+
+    button:active{ transform: translateY(1px); }
+
+    /* summary badges */
+
+    .sub{
+
+      font-size: 12px;
+
+      color: var(--muted);
+
+      display:flex;
+
+      gap:10px;
+
+      flex-wrap:wrap;
+
+      align-items:center;
+
+    }
+
+    .badge{
+
+      display:inline-flex;
+
+      align-items:center;
+
+      gap:8px;
+
+      padding: 6px 10px;
+
+      border-radius: 999px;
+
+      background: rgba(255,255,255,.06);
+
+      border: 1px solid rgba(255,255,255,.10);
+
+      color: var(--text);
+
+      white-space:nowrap;
+
+    }
+
+    .badgeDot{
+
+      width:10px; height:10px; border-radius:50%;
+
+      background: var(--accent);
+
+      box-shadow: 0 0 0 4px var(--accentSoft);
+
+    }
+
+    .badge b{ color: var(--accent); }
+
+    /* TOP3 full row (equal width). TOP1 larger 10% without overlap */
+
+    .top3row{
+
+      width: 100%;
+
+      display:grid;
+
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+
+      gap: 10px;
+
+      align-items: stretch;
+
+    }
+
+    @media (max-width: 760px){
+
+      .top3row{ grid-template-columns: 1fr; }
+
+    }
+
+    .topCard{
+
+      border-radius: 16px;
+
+      padding: 12px 12px;
+
+      display:flex;
+
+      flex-direction:column;
+
+      justify-content:space-between;
+
+      min-height: 78px;
+
+      border: 1px solid rgba(255,255,255,.10);
+
+      box-shadow: var(--shadow);
+
+      overflow:hidden;
+
+    }
+
+    .topCard.base{
+
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+
+    }
+
+    .topCard.base.green{
+
+      background: linear-gradient(180deg, rgba(34,197,94,.18), rgba(255,255,255,.03));
+
+      border-color: rgba(34,197,94,.25);
+
+    }
+
+    .topCard.base.pink{
+
+      background: linear-gradient(180deg, rgba(236,72,153,.18), rgba(255,255,255,.03));
+
+      border-color: rgba(236,72,153,.25);
+
+    }
+
+    /* ✅ FIX: no transform scaling (avoids overlap) */
+
+    .topCard.top1{
+
+      min-height: 86px;
+
+      padding: 14px 14px;
+
+    }
+
+    .topCard.top1 .score{ font-size: 24px; }
+
+    .topCard.top1 .label{
+
+      font-size: 15px;
+
+      font-weight: 800;
+
+    }
+
+    .topCard .line1{
+
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+
+      font-size: 12px; color: rgba(229,231,235,.78);
+
+    }
+
+    .topCard .rank{
+
+      width: 24px; height: 24px;
+
+      display:grid; place-items:center;
+
+      border-radius: 999px;
+
+      background: rgba(255,255,255,.14);
+
+      border: 1px solid rgba(255,255,255,.18);
+
+      font-weight: 900;
+
+      color: var(--text);
+
+      flex: 0 0 auto;
+
+    }
+
+    .topCard .line2{
+
+      display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+
+      margin-top: 8px;
+
+    }
+
+    .topCard .label{
+
+      font-size: 14px;
+
+      color: var(--text);
+
+      overflow:hidden;
+
+      text-overflow: ellipsis;
+
+      white-space: nowrap;
+
+      max-width: 100%;
+
+    }
+
+    .topCard .score{
+
+      font-size: 22px;
+
+      font-weight: 900;
+
+      color: var(--text);
+
+      flex: 0 0 auto;
+
+    }
+
+    .container{ padding: 12px 12px 118px; }
+
+    /* responsive cols (shared) */
+
+    @media (min-width: 390px){ :root{ --cols: 4; } }
+
+    @media (min-width: 480px){ :root{ --cols: 5; } }
+
+    /* number grid */
+
+    .grid{
+
+      margin-top: 12px;
+
+      display:grid;
+
+      grid-template-columns: repeat(var(--cols), 1fr);
+
+      gap: var(--gap);
+
+    }
+
+    .tile{
+
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+
+      border: 1px solid rgba(255,255,255,.08);
+
+      border-radius: var(--radius);
+
+      padding: 12px 10px;
+
+      min-height: 86px;
+
+      display:flex; flex-direction:column; justify-content:space-between;
+
+      box-shadow: var(--shadow);
+
+      user-select:none;
+
+      cursor:pointer;
+
+    }
+
+    .num{ font-size: 20px; font-weight: 850; letter-spacing:.3px; }
+
+    .party{
+
+      font-size: 11px;
+
+      color: var(--muted);
+
+      line-height:1.2;
+
+      min-height: 28px;
+
+      overflow:hidden;
+
+    }
+
+    .party.hide{ display:none; min-height:0; }
+
+    .count{
+
+      margin-top:8px;
+
+      font-size: 15px;
+
+      font-weight: 750;
+
+      display:flex; align-items:center; justify-content:space-between;
+
+    }
+
+    .count span{ color: var(--accent); font-weight: 900; }
+
+    /* ✅ special last row uses SAME columns => SAME tile size */
+
+    .specialGrid{
+
+      margin-top: 12px;
+
+      display:grid;
+
+      grid-template-columns: repeat(var(--cols), 1fr);
+
+      gap: var(--gap);
+
+    }
+
+    .tile.special{
+
+      /* same size as normal tiles (don’t stretch) */
+
+      min-height: 86px;
+
+    }
+
+    .tile.special .num{ font-size: 16px; letter-spacing: 0; }
+
+    .tile.special .party{
+
+      font-size: 12px;
+
+      min-height: 0;
+
+      color: rgba(229,231,235,.92);
+
+    }
+
+    /* ✅ colors */
+
+    .tile.special.novote{
+
+      background: linear-gradient(180deg, var(--yellowSoft), rgba(255,255,255,.03));
+
+      border-color: var(--yellowBorder);
+
+    }
+
+    .tile.special.novote .count span{
+
+      color: var(--yellow);
+
+    }
+
+    .tile.special.invalid{
+
+      background: linear-gradient(180deg, var(--redSoft), rgba(255,255,255,.03));
+
+      border-color: var(--redBorder);
+
+    }
+
+    .tile.special.invalid .count span{
+
+      color: var(--red);
+
+    }
+
+    /* footer */
+
+    .footer{
+
+      position: fixed; left:0; right:0; bottom:0;
+
+      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+
+      background: rgba(11,18,32,.90);
+
+      backdrop-filter: blur(10px);
+
+      border-top: 1px solid rgba(255,255,255,.07);
+
+      display:flex; gap:8px;
+
+      align-items:center;
+
+    }
+
+    .footer button{ flex:1; padding: 12px 10px; border-radius: 16px; }
+
+    .footer .version{
+
+      flex: 0 0 auto;
+
+      font-size: 11px;
+
+      color: rgba(229,231,235,.55);
+
+      padding-left: 6px;
+
+      white-space:nowrap;
+
+    }
+
+    /* Popup */
+
+    .popup{
+
+      position: fixed; inset:0; z-index:50;
+
+      display:none;
+
+      align-items:center; justify-content:center;
+
+      padding: 14px;
+
+      background: rgba(0,0,0,.52);
+
+      backdrop-filter: blur(6px);
+
+    }
+
+    .popCard{
+
+      width: min(520px, 100%);
+
+      background: rgba(18,27,46,.98);
+
+      border: 1px solid rgba(255,255,255,.10);
+
+      border-radius: 26px;
+
+      box-shadow: var(--shadow);
+
+      padding: 18px 16px;
+
+      text-align:center;
+
+    }
+
+    .popNum{ font-size: 54px; font-weight: 900; margin: 2px 0; }
+
+    .popParty{ font-size: 15px; color: var(--text); margin-top: 2px; opacity: .92; }
+
+    .popParty.hide{ display:none; }
+
+    .popTotal{ margin-top: 10px; font-size: 15px; color: var(--muted); }
+
+    .popTotal b{ color: var(--accent); font-size: 22px; }
+
+    /* Settings modal */
+
+    .modal{
+
+      position: fixed; inset:0; z-index:60;
+
+      display:none;
+
+      align-items:center; justify-content:center;
+
+      padding: 14px;
+
+      background: rgba(0,0,0,.55);
+
+      backdrop-filter: blur(6px);
+
+    }
+
+    .panel{
+
+      width:100%;
+
+      max-width: 640px;
+
+      background: rgba(18,27,46,.98);
+
+      border: 1px solid rgba(255,255,255,.10);
+
+      border-radius: 22px;
+
+      box-shadow: var(--shadow);
+
+      overflow:hidden;
+
+    }
+
+    .panelH{
+
+      padding: 14px 14px 10px;
+
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+
+      border-bottom: 1px solid rgba(255,255,255,.08);
+
+    }
+
+    .panelH b{ font-size: 15px; }
+
+    .panelB{ padding: 12px 14px 14px; }
+
+    label{ display:block; font-size: 12px; color:rgba(229,231,235,.78); margin: 10px 0 6px; }
+
+    /* improved contrast for dropdown / input */
+
+    input, textarea, select{
+
+      width:100%;
+
+      background: var(--fieldBg);
+
+      border: 1px solid var(--fieldBorder);
+
+      color: var(--fieldText);
+
+      border-radius: 14px;
+
+      padding: 12px 12px;
+
+      font-size: 14px;
+
+      outline:none;
+
+    }
+
+    select{
+
+      appearance: none;
+
+      background-image:
+
+        linear-gradient(45deg, transparent 50%, rgba(243,244,246,.85) 50%),
+
+        linear-gradient(135deg, rgba(243,244,246,.85) 50%, transparent 50%),
+
+        linear-gradient(to right, transparent, transparent);
+
+      background-position:
+
+        calc(100% - 18px) calc(1em + 2px),
+
+        calc(100% - 13px) calc(1em + 2px),
+
+        calc(100% - 2.6em) 0.45em;
+
+      background-size: 6px 6px, 6px 6px, 1px 1.6em;
+
+      background-repeat: no-repeat;
+
+      padding-right: 38px;
+
+    }
+
+    textarea{ min-height: 140px; resize: vertical; line-height:1.35; }
+
+    .row{ display:flex; gap:10px; flex-wrap:wrap; }
+
+    .row > *{ flex:1; min-width: 180px; }
+
+    .hint{ font-size: 12px; color: var(--fieldTextMuted); margin-top: 6px; line-height:1.35; }
+
+    .panelActions{
+
+      display:flex; gap:10px;
+
+      padding: 12px 14px 14px;
+
+      border-top: 1px solid rgba(255,255,255,.08);
+
+      flex-wrap:wrap;
+
+    }
+
+    .panelActions button{
+
+      flex:1;
+
+      min-width: 180px;
+
+      padding: 14px 12px;
+
+      border-radius: 16px;
+
+      font-weight: 800;
+
+    }
+
+    /* advanced (hidden by default) */
+
+    .advanced{
+
+      display:none;
+
+      margin-top: 10px;
+
+      padding-top: 10px;
+
+      border-top: 1px dashed rgba(255,255,255,.14);
+
+    }
+
+    .advanced.show{ display:block; }
+
+    .linkBtn{
+
+      background: transparent;
+
+      border: 1px dashed rgba(255,255,255,.22);
+
+      color: rgba(229,231,235,.9);
+
+    }
+</style>
+</head>
+<body>
+<header>
+<div class="brand">
+<div class="brandTop">
+<h1>VOTE 2569</h1>
+<div class="actions">
+<div class="seg">
+<button id="seg1">บัตร 1</button>
+<button id="seg2">บัตร 2</button>
+</div>
+<button id="btnSettings">⚙️ ตั้งค่า</button>
+</div>
+</div>
+<div class="sub">
+<span class="badge"><span class="badgeDot"></span><span id="activeBallotName">—</span></span>
+<span class="badge">พื้นที่: <b id="areaLabel">—</b></span>
+<span class="badge">นับแล้ว (รวมบัตร): <b id="metaTotalAll">0</b></span>
+<span class="badge">บัตรคะแนนรวม: <b id="metaTotalValid">0</b></span>
+<span class="badge">บัตรไม่เลือกผู้ใด: <b id="metaNoVote">0</b></span>
+<span class="badge">บัตรเสีย: <b id="metaInvalid">0</b></span>
+</div>
+<div class="top3row" id="top3"></div>
+</div>
+</header>
+<div class="container">
+<div class="grid" id="grid"></div>
+<div class="specialGrid" id="specialGrid"></div>
+</div>
+<div class="footer">
+<button id="btnUndo">Undo</button>
+<button id="btnReset">Reset</button>
+<button id="btnExport">Export</button>
+<span class="version">v26.0.0</span>
+</div>
+<!-- Popup -->
+<div class="popup" id="popup" aria-hidden="true">
+<div class="popCard">
+<div class="popNum" id="popNum">-</div>
+<div class="popParty" id="popParty">-</div>
+<div class="popTotal">Total: <b id="popTotal">0</b></div>
+<div class="hint" style="margin-top:10px;">Auto close • Tap anywhere to close</div>
+</div>
+</div>
+<!-- Settings -->
+<div class="modal" id="settingsModal" aria-hidden="true">
+<div class="panel" role="dialog" aria-modal="true">
+<div class="panelH">
+<b>⚙️ ตั้งค่า</b>
+<button id="btnCloseSettings">✖</button>
+</div>
+<div class="panelB">
+<div class="row">
+<div>
+<label>เลือกบัตร</label>
+<select id="editWhich">
+<option value="ballot1">บัตรที่ 1 สส. เขต (เขียว)</option>
+<option value="ballot2">บัตรที่ 2 สส. บัญชีรายชื่อ (ชมพู)</option>
+</select>
+</div>
+<div>
+<label>Popup auto-close (ms)</label>
+<input id="popupMs" type="number" min="200" max="5000" step="50" inputmode="numeric" />
+</div>
+</div>
+<div class="row">
+<div>
+<label>จังหวัด (Province)</label>
+<select id="provinceSel"></select>
+</div>
+<div>
+<label>เขต (District)</label>
+<select id="districtSel"></select>
+</div>
+</div>
+
+<div class="row">
+<div>
+<label>จำนวนหมายเลข (Max number)</label>
+<input id="maxNumber" type="number" min="1" max="200" inputmode="numeric" />
+</div>
+<div>
+<label>แสดงชื่อพรรค</label>
+<select id="showNames">
+<option value="yes">Yes</option>
+<option value="no">No</option>
+</select>
+</div>
+</div>
+<label>ตัวอย่าง หมายเลข: ชื่อพรรค</label>
+<textarea id="partyMap" placeholder="ตัวอย่าง:
+
+1: ประชาชน
+
+5: เพื่อไทย"></textarea>
+
+<!-- advanced hidden -->
+<button class="linkBtn" id="toggleAdvanced" type="button">Advanced</button>
+<div class="advanced" id="advancedBox">
+<label>ตัวอย่าง "จังหวัด" : จำนวนเขต</label>
+<textarea id="provJson" placeholder='ตัวอย่าง:
+
+{
+
+  "กรุงเทพมหานคร": 33,
+
+  "ชลบุรี": 10
+
+}'></textarea>
+
+</div>
+</div>
+<!-- ✅ only one button to avoid confusion -->
+<div class="panelActions">
+<button id="btnSaveSettings">บันทึก</button>
+</div>
+</div>
+</div>
+<script>
+
+(() => {
+
+  const VERSION = "26.0.0";
+
+  const LS_KEY = "vote2569_ui_v26_3";
+
+  /* Province -> district count (starter)
+
+     เติมครบ 77 จังหวัดทีหลังได้ผ่าน "ตั้งค่าขั้นสูง" */
+
+  const START_PROVINCES = {
+
+    "— เลือกจังหวัด —": 0,
+
+    "เชียงใหม่": 10, "เชียงราย": 7, "ลำปาง": 4, "ตาก": 3, "น่าน": 3, "พะเยา": 3, "แพร่": 3, "อุตรดิตถ์": 2, "ลำพูน": 2,
+
+    "นครราชสีมา": 16, "ขอนแก่น": 11, "อุบลราชธานี": 11, "บุรีรัมย์": 10, "ศรีสะเกษ": 9, "อุดรธานี": 9, "ร้อยเอ็ด": 8, "สุรินทร์": 8, "ชัยภูมิ": 7, "สกลนคร": 7,
+
+    "กาฬสินธุ์": 6, "มหาสารคาม": 6, "นครพนม": 4, "เลย": 4, "ยโสธร": 3, "หนองคาย": 3, "หนองบัวลำภู": 3, "บึงกาฬ": 3, "อำนาจเจริญ": 2, "มุกดาหาร": 2,
+
+    "กรุงเทพมหานคร": 33, "นนทบุรี": 8, "สมุทรปราการ": 8, "ชลบุรี": 10, "ปทุมธานี": 7, "นครปฐม": 6, "พระนครศรีอยุธยา": 5, "ระยอง": 5,
+
+    "สุพรรณบุรี": 5, "สระบุรี": 4, "ฉะเชิงเทรา": 4, "สมุทรสาคร": 3, "ปราจีนบุรี": 3, "จันทบุรี": 3, "ประจวบคีรีขันธ์": 3,
+
+    "ราชบุรี": 5, "เพชรบุรี": 3, "กาญจนบุรี": 5, "นครนายก": 2, "สระแก้ว": 3, "อ่างทอง": 2, "ชัยนาท": 2, "สิงห์บุรี": 1, "สมุทรสงคราม": 1, "ตราด": 1,
+
+    "นครศรีธรรมราช": 10, "สงขลา": 9, "สุราษฎร์ธานี": 7, "นราธิวาส": 5, "ปัตตานี": 5, "ยะลา": 3, "ตรัง": 4, "พัทลุง": 3,
+
+    "ชุมพร": 3, "กระบี่": 3, "ภูเก็ต": 3, "พังงา": 2, "สตูล": 2, "ระนอง": 1,
+
+    "นครสวรรค์": 6, "เพชรบูรณ์": 6, "พิษณุโลก": 5, "กำแพงเพชร": 4, "พิจิตร": 3, "สุโขทัย": 4, "อุทัยธานี": 2
+
+  };
+
+  function presetBallot1(){
+
+    return {
+
+      title: "บัตรที่ 1 สส. เขต",
+
+      theme: {
+
+        accent:"#22c55e",
+
+        accentSoft:"rgba(34,197,94,.16)",
+
+        accentBorder:"rgba(34,197,94,.35)",
+
+        glow1:"rgba(34,197,94,.18)",
+
+        glow2:"rgba(59,130,246,.10)"
+
+      },
+
+      maxNumber: 20,
+
+      showNames: false,
+
+      partyNames: {},
+
+      counts: {},
+
+      special: { novote:0, invalid:0 },
+
+      history: []
+
+    };
+
+  }
+
+  function presetBallot2_2569(){
+
+    return {
+
+      title: "บัตรที่ 2 สส. บัญชีรายชื่อ",
+
+      theme: {
+
+        accent:"#ec4899",
+
+        accentSoft:"rgba(236,72,153,.16)",
+
+        accentBorder:"rgba(236,72,153,.40)",
+
+        glow1:"rgba(236,72,153,.18)",
+
+        glow2:"rgba(59,130,246,.08)"
+
+      },
+
+      maxNumber: 57,
+
+      showNames: true,
+
+      partyNames: {
+
+        "1":"ไทยทรัพย์ทวี",
+
+        "2":"เพื่อชาติไทย",
+
+        "3":"ใหม่",
+
+        "4":"มิติใหม่",
+
+        "5":"รวมใจไทย",
+
+        "6":"รวมไทยสร้างชาติ",
+
+        "7":"พลวัต",
+
+        "8":"ประชาธิปไตยใหม่",
+
+        "9":"เพื่อไทย",
+
+        "10":"ทางเลือกใหม่",
+
+        "11":"เศรษฐกิจ",
+
+        "12":"เสรีรวมไทย",
+
+        "13":"รวมพลังประชาชน",
+
+        "14":"ท้องที่ไทย",
+
+        "15":"อนาคตไทย",
+
+        "16":"พลังเพื่อไทย",
+
+        "17":"ไทยชนะ",
+
+        "18":"พลังสังคมใหม่",
+
+        "19":"สังคมประชาธิปไตย",
+
+        "20":"ฟิวชัน",
+
+        "21":"ไทยรวมพลัง",
+
+        "22":"ก้าวอิสระ",
+
+        "23":"ปวงชนไทย",
+
+        "24":"วิชชั่นใหม่",
+
+        "25":"เพื่อชีวิตใหม่",
+
+        "26":"คลองไทย",
+
+        "27":"ประชาธิปัตย์",
+
+        "28":"ไทยก้าวหน้า",
+
+        "29":"ไทยภักดี",
+
+        "30":"แรงงานสร้างชาติ",
+
+        "31":"ประชากรไทย",
+
+        "32":"ครูไทยเพื่อประชาชน",
+
+        "33":"ประชาชาติ",
+
+        "34":"สร้างอนาคตไทย",
+
+        "35":"รักชาติ",
+
+        "36":"ไทยพร้อม",
+
+        "37":"ภูมิใจไทย",
+
+        "38":"พลังธรรมใหม่",
+
+        "39":"กรีน",
+
+        "40":"ไทยธรรม",
+
+        "41":"แผ่นดินธรรม",
+
+        "42":"กล้าธรรม",
+
+        "43":"พลังประชารัฐ",
+
+        "44":"โอกาสใหม่",
+
+        "45":"เป็นธรรม",
+
+        "46":"ประชาชน",
+
+        "47":"ประชาไทย",
+
+        "48":"ไทยสร้างไทย",
+
+        "49":"ไทยก้าวใหม่",
+
+        "50":"ประชาอาสาชาติ",
+
+        "51":"พร้อม",
+
+        "52":"เครือข่ายชาวนาแห่งประเทศไทย",
+
+        "53":"ไทยพิทักษ์ธรรม",
+
+        "54":"ความหวังใหม่",
+
+        "55":"ไทยรวมไทย",
+
+        "56":"เพื่อบ้านเมือง",
+
+        "57":"พลังไทยรักชาติ"
+
+      },
+
+      counts: {},
+
+      special: { novote:0, invalid:0 },
+
+      history: []
+
+    };
+
+  }
+
+  function defaultState(){
+
+    return {
+
+      version: VERSION,
+
+      active: "ballot2",
+
+      popupMs: 2000,
+
+      provinceMap: START_PROVINCES,
+
+      selectedProvince: "— เลือกจังหวัด —",
+
+      selectedDistrict: 0,
+
+      ballot1: presetBallot1(),
+
+      ballot2: presetBallot2_2569(),
+
+      showAdvanced: false
+
+    };
+
+  }
+
+  function loadState(){
+
+    try{
+
+      const raw = localStorage.getItem(LS_KEY);
+
+      if(!raw) return defaultState();
+
+      const obj = JSON.parse(raw);
+
+      return { ...defaultState(), ...obj };
+
+    }catch(e){
+
+      return defaultState();
+
+    }
+
+  }
+
+  let state = loadState();
+
+  let popupTimer = null;
+
+  const el = {
+
+    seg1: document.getElementById("seg1"),
+
+    seg2: document.getElementById("seg2"),
+
+    activeBallotName: document.getElementById("activeBallotName"),
+
+    areaLabel: document.getElementById("areaLabel"),
+
+    metaTotalAll: document.getElementById("metaTotalAll"),
+
+    metaTotalValid: document.getElementById("metaTotalValid"),
+
+    metaNoVote: document.getElementById("metaNoVote"),
+
+    metaInvalid: document.getElementById("metaInvalid"),
+
+    top3: document.getElementById("top3"),
+
+    grid: document.getElementById("grid"),
+
+    specialGrid: document.getElementById("specialGrid"),
+
+    btnUndo: document.getElementById("btnUndo"),
+
+    btnReset: document.getElementById("btnReset"),
+
+    btnExport: document.getElementById("btnExport"),
+
+    popup: document.getElementById("popup"),
+
+    popNum: document.getElementById("popNum"),
+
+    popParty: document.getElementById("popParty"),
+
+    popTotal: document.getElementById("popTotal"),
+
+    btnSettings: document.getElementById("btnSettings"),
+
+    settingsModal: document.getElementById("settingsModal"),
+
+    btnCloseSettings: document.getElementById("btnCloseSettings"),
+
+    editWhich: document.getElementById("editWhich"),
+
+    popupMs: document.getElementById("popupMs"),
+
+    provinceSel: document.getElementById("provinceSel"),
+
+    districtSel: document.getElementById("districtSel"),
+
+    maxNumber: document.getElementById("maxNumber"),
+
+    showNames: document.getElementById("showNames"),
+
+    partyMap: document.getElementById("partyMap"),
+
+    toggleAdvanced: document.getElementById("toggleAdvanced"),
+
+    advancedBox: document.getElementById("advancedBox"),
+
+    provJson: document.getElementById("provJson"),
+
+    btnSaveSettings: document.getElementById("btnSaveSettings"),
+
+  };
+
+  function activeBallot(){ return state[state.active]; }
+
+  function saveState(){
+
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+
+  }
+
+  function ensureCounts(b){
+
+    for(let i=1;i<=b.maxNumber;i++){
+
+      const k = String(i);
+
+      if(typeof b.counts[k] !== "number") b.counts[k] = 0;
+
+    }
+
+    Object.keys(b.counts).forEach(k => {
+
+      const n = Number(k);
+
+      if(n > b.maxNumber) delete b.counts[k];
+
+    });
+
+    if(!b.special) b.special = { novote:0, invalid:0 };
+
+    if(typeof b.special.novote !== "number") b.special.novote = 0;
+
+    if(typeof b.special.invalid !== "number") b.special.invalid = 0;
+
+    if(!Array.isArray(b.history)) b.history = [];
+
+  }
+
+  function applyTheme(){
+
+    const b = activeBallot();
+
+    document.documentElement.style.setProperty("--accent", b.theme.accent);
+
+    document.documentElement.style.setProperty("--accentSoft", b.theme.accentSoft);
+
+    document.documentElement.style.setProperty("--accentBorder", b.theme.accentBorder);
+
+    document.documentElement.style.setProperty("--headerGlow1", b.theme.glow1);
+
+    document.documentElement.style.setProperty("--headerGlow2", b.theme.glow2);
+
+  }
+
+  function totalValid(b){
+
+    return Object.values(b.counts).reduce((a,c)=>a+(c||0),0);
+
+  }
+
+  function totalAll(b){
+
+    return totalValid(b) + (b.special?.novote||0) + (b.special?.invalid||0);
+
+  }
+
+  function partyLabel(b, num){
+
+    const name = b.partyNames[String(num)];
+
+    return name && name.trim() ? name.trim() : "(ยังไม่ตั้งชื่อ)";
+
+  }
+
+  function calcTop3(b){
+
+    const arr = [];
+
+    for(let i=1;i<=b.maxNumber;i++){
+
+      const k = String(i);
+
+      arr.push({ num:k, party: partyLabel(b,k), count: b.counts[k]||0 });
+
+    }
+
+    arr.sort((x,y)=> y.count - x.count || Number(x.num)-Number(y.num));
+
+    return arr.slice(0,3);
+
+  }
+
+  function renderTop3(){
+
+    const b = activeBallot();
+
+    const top = calcTop3(b);
+
+    el.top3.innerHTML = "";
+
+    const baseClass = (state.active === "ballot1") ? "green" : "pink";
+
+    top.forEach((t, idx) => {
+
+      const card = document.createElement("div");
+
+      card.className = "topCard base " + baseClass + (idx===0 ? " top1" : "");
+
+      card.innerHTML = `
+<div class="line1">
+<span class="rank">${idx+1}</span>
+<span>TOP</span>
+</div>
+<div class="line2">
+<div class="label">#${t.num}${b.showNames ? " " + escapeHtml(t.party) : ""}</div>
+<div class="score">${t.count}</div>
+</div>
+
+      `;
+
+      el.top3.appendChild(card);
+
+    });
+
+  }
+
+  function renderSeg(){
+
+    el.seg1.classList.toggle("active", state.active === "ballot1");
+
+    el.seg2.classList.toggle("active", state.active === "ballot2");
+
+  }
+
+  function renderArea(){
+
+    const p = state.selectedProvince || "—";
+
+    const d = state.selectedDistrict || 0;
+
+    if(p && p !== "— เลือกจังหวัด —" && d>0){
+
+      el.areaLabel.textContent = `${p} เขต ${d}`;
+
+    }else if(p && p !== "— เลือกจังหวัด —"){
+
+      el.areaLabel.textContent = `${p}`;
+
+    }else{
+
+      el.areaLabel.textContent = "—";
+
+    }
+
+  }
+
+  function renderGrid(){
+
+    const b = activeBallot();
+
+    ensureCounts(b);
+
+    el.grid.innerHTML = "";
+
+    const frag = document.createDocumentFragment();
+
+    for(let i=1;i<=b.maxNumber;i++){
+
+      const k = String(i);
+
+      const tile = document.createElement("div");
+
+      tile.className = "tile";
+
+      const top = document.createElement("div");
+
+      const num = document.createElement("div");
+
+      num.className = "num";
+
+      num.textContent = k;
+
+      const party = document.createElement("div");
+
+      party.className = "party" + (b.showNames ? "" : " hide");
+
+      party.textContent = partyLabel(b, k);
+
+      top.appendChild(num);
+
+      top.appendChild(party);
+
+      const bottom = document.createElement("div");
+
+      bottom.className = "count";
+
+      bottom.innerHTML = `<div>Count</div><span>${b.counts[k] || 0}</span>`;
+
+      tile.appendChild(top);
+
+      tile.appendChild(bottom);
+
+      tile.addEventListener("click", () => incParty(k, +1, true));
+
+      frag.appendChild(tile);
+
+    }
+
+    el.grid.appendChild(frag);
+
+  }
+
+  function showPopupNumber(numStr){
+
+    clearTimeout(popupTimer);
+
+    const b = activeBallot();
+
+    const k = String(numStr);
+
+    el.popNum.textContent = k;
+
+    el.popParty.textContent = partyLabel(b, k);
+
+    el.popTotal.textContent = b.counts[k] || 0;
+
+    el.popParty.classList.toggle("hide", !b.showNames);
+
+    el.popup.style.display = "flex";
+
+    el.popup.setAttribute("aria-hidden","false");
+
+    popupTimer = setTimeout(() => closePopup(), state.popupMs || 2000);
+
+  }
+
+  function showPopupSpecial(label, total){
+
+    clearTimeout(popupTimer);
+
+    el.popNum.textContent = "";               // keep simple
+
+    el.popParty.textContent = label;
+
+    el.popTotal.textContent = total;
+
+    el.popParty.classList.remove("hide");
+
+    el.popup.style.display = "flex";
+
+    el.popup.setAttribute("aria-hidden","false");
+
+    popupTimer = setTimeout(() => closePopup(), state.popupMs || 2000);
+
+  }
+
+  function closePopup(){
+
+    clearTimeout(popupTimer);
+
+    el.popup.style.display = "none";
+
+    el.popup.setAttribute("aria-hidden","true");
+
+  }
+
+  function renderSpecialRow(){
+
+    const b = activeBallot();
+
+    ensureCounts(b);
+
+    el.specialGrid.innerHTML = "";
+
+    const makeSpecial = (key, label, cls) => {
+
+      const tile = document.createElement("div");
+
+      tile.className = `tile special ${cls}`;
+
+      const top = document.createElement("div");
+
+      const title = document.createElement("div");
+
+      title.className = "num";
+
+      title.textContent = label;
+
+      const sub = document.createElement("div");
+
+      sub.className = "party";
+
+      sub.textContent = "Count";
+
+      top.appendChild(title);
+
+      top.appendChild(sub);
+
+      const bottom = document.createElement("div");
+
+      bottom.className = "count";
+
+      bottom.innerHTML = `<div></div><span>${b.special[key] || 0}</span>`;
+
+      tile.appendChild(top);
+
+      tile.appendChild(bottom);
+
+      tile.addEventListener("click", () => {
+
+        incSpecial(key, +1);
+
+        showPopupSpecial(label, b.special[key]);
+
+      });
+
+      return tile;
+
+    };
+
+    // ✅ yellow + red, and SAME size as number tiles, placed on last row
+
+    el.specialGrid.appendChild(makeSpecial("novote", "บัตรไม่เลือกผู้ใด", "novote"));
+
+    el.specialGrid.appendChild(makeSpecial("invalid", "บัตรเสีย", "invalid"));
+
+  }
+
+  function incParty(numStr, delta, showPop){
+
+    const b = activeBallot();
+
+    ensureCounts(b);
+
+    const k = String(numStr);
+
+    b.counts[k] = Math.max(0, (b.counts[k] || 0) + delta);
+
+    b.history.push({ kind:"party", num:k, delta, ts: Date.now() });
+
+    saveState();
+
+    render();
+
+    if(showPop) showPopupNumber(k);
+
+  }
+
+  function incSpecial(key, delta){
+
+    const b = activeBallot();
+
+    ensureCounts(b);
+
+    b.special[key] = Math.max(0, (b.special[key] || 0) + delta);
+
+    b.history.push({ kind:"special", key, delta, ts: Date.now() });
+
+    saveState();
+
+    render();
+
+  }
+
+  function undo(){
+
+    const b = activeBallot();
+
+    const last = b.history.pop();
+
+    if(!last) return;
+
+    if(last.kind === "party"){
+
+      const k = last.num;
+
+      b.counts[k] = Math.max(0, (b.counts[k] || 0) - last.delta);
+
+    }else{
+
+      const key = last.key;
+
+      b.special[key] = Math.max(0, (b.special[key] || 0) - last.delta);
+
+    }
+
+    saveState();
+
+    render();
+
+  }
+
+  function resetAll(){
+
+    const b = activeBallot();
+
+    if(!confirm(`Reset ทั้งหมดของ ${b.title} ?`)) return;
+
+    b.counts = {};
+
+    b.special = { novote:0, invalid:0 };
+
+    b.history = [];
+
+    saveState();
+
+    render();
+
+  }
+
+  function exportText(){
+
+    const b = activeBallot();
+
+    let valid = 0;
+
+    const rows = [];
+
+    for(let i=1;i<=b.maxNumber;i++){
+
+      const k = String(i);
+
+      const c = b.counts[k] || 0;
+
+      if(c>0){
+
+        valid += c;
+
+        rows.push(b.showNames ? `${k}\t${partyLabel(b,k)}\t${c}` : `${k}\t${c}`);
+
+      }
+
+    }
+
+    const nov = b.special?.novote || 0;
+
+    const inv = b.special?.invalid || 0;
+
+    const header =
+
+`VOTE 2569 Export (v${VERSION})
+
+Ballot: ${b.title}
+
+Area: ${(state.selectedProvince && state.selectedProvince!=="— เลือกจังหวัด —") ? state.selectedProvince : "-"} ${(state.selectedDistrict>0) ? ("เขต "+state.selectedDistrict) : ""}
+
+บัตรคะแนนรวม: ${valid}
+
+บัตรไม่เลือกผู้ใด: ${nov}
+
+บัตรเสีย: ${inv}
+
+รวมบัตรที่นับแล้ว: ${valid+nov+inv}
+
+` + (b.showNames ? `No\tParty\tCount\n` : `No\tCount\n`);
+
+    return header + (rows.length ? rows.join("\n") : "(no votes yet)");
+
+  }
+
+  async function copyToClipboard(text){
+
+    try{
+
+      await navigator.clipboard.writeText(text);
+
+      alert("Copied ✅");
+
+    }catch(e){
+
+      const ta = document.createElement("textarea");
+
+      ta.value = text;
+
+      document.body.appendChild(ta);
+
+      ta.select();
+
+      document.execCommand("copy");
+
+      document.body.removeChild(ta);
+
+      alert("Copied ✅");
+
+    }
+
+  }
+
+  function parsePartyMap(text){
+
+    const out = {};
+
+    const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+
+    for(const line of lines){
+
+      let m = line.match(/^(\d+)\s*[:\-]\s*(.+)$/);
+
+      if(!m) continue;
+
+      const n = Number(m[1]);
+
+      if(!Number.isFinite(n)) continue;
+
+      out[String(n)] = String(m[2]).trim();
+
+    }
+
+    return out;
+
+  }
+
+  function parseProvinceJson(text){
+
+    try{
+
+      const obj = JSON.parse(text);
+
+      const out = {};
+
+      for(const [k,v] of Object.entries(obj)){
+
+        const n = Number(v);
+
+        if(!k || !Number.isFinite(n) || n<0 || n>400) continue;
+
+        out[String(k)] = Math.floor(n);
+
+      }
+
+      if(!("— เลือกจังหวัด —" in out)) out["— เลือกจังหวัด —"] = 0;
+
+      return out;
+
+    }catch(e){
+
+      return null;
+
+    }
+
+  }
+
+  function buildProvinceOptions(){
+
+    const provMap = state.provinceMap || START_PROVINCES;
+
+    const provinces = Object.keys(provMap).sort((a,b)=>{
+
+      if(a==="— เลือกจังหวัด —") return -1;
+
+      if(b==="— เลือกจังหวัด —") return 1;
+
+      return a.localeCompare(b, "th");
+
+    });
+
+    el.provinceSel.innerHTML = "";
+
+    provinces.forEach(p => {
+
+      const opt = document.createElement("option");
+
+      opt.value = p;
+
+      opt.textContent = p;
+
+      el.provinceSel.appendChild(opt);
+
+    });
+
+    el.provinceSel.value = state.selectedProvince || "— เลือกจังหวัด —";
+
+    buildDistrictOptions();
+
+  }
+
+  function buildDistrictOptions(){
+
+    const prov = el.provinceSel.value;
+
+    const n = Number((state.provinceMap||START_PROVINCES)[prov] || 0);
+
+    el.districtSel.innerHTML = "";
+
+    const opt0 = document.createElement("option");
+
+    opt0.value = "0";
+
+    opt0.textContent = "—";
+
+    el.districtSel.appendChild(opt0);
+
+    for(let i=1;i<=n;i++){
+
+      const opt = document.createElement("option");
+
+      opt.value = String(i);
+
+      opt.textContent = `เขต ${i}`;
+
+      el.districtSel.appendChild(opt);
+
+    }
+
+    const want = String(state.selectedDistrict || 0);
+
+    el.districtSel.value = (n>0 && Number(want)<=n) ? want : "0";
+
+  }
+
+  function openSettings(){
+
+    el.popupMs.value = state.popupMs;
+
+    el.editWhich.value = state.active;
+
+    buildProvinceOptions();
+
+    el.advancedBox.classList.toggle("show", !!state.showAdvanced);
+
+    if(state.showAdvanced){
+
+      el.provJson.value = JSON.stringify(state.provinceMap || START_PROVINCES, null, 2);
+
+    }
+
+    loadSettingsFormFor(el.editWhich.value);
+
+    el.settingsModal.style.display = "flex";
+
+    el.settingsModal.setAttribute("aria-hidden","false");
+
+  }
+
+  function closeSettings(){
+
+    el.settingsModal.style.display = "none";
+
+    el.settingsModal.setAttribute("aria-hidden","true");
+
+  }
+
+  function loadSettingsFormFor(which){
+
+    const b = state[which];
+
+    el.maxNumber.value = b.maxNumber;
+
+    el.showNames.value = b.showNames ? "yes" : "no";
+
+    const keys = Object.keys(b.partyNames).map(Number).sort((a,b)=>a-b);
+
+    el.partyMap.value = keys.map(k => `${k}: ${b.partyNames[String(k)]}`).join("\n");
+
+  }
+
+  function saveSettings(){
+
+    const which = el.editWhich.value;
+
+    const b = state[which];
+
+    const popMs = Number(el.popupMs.value);
+
+    state.popupMs = (Number.isFinite(popMs) && popMs>=200 && popMs<=5000) ? Math.floor(popMs) : 2000;
+
+    if(state.showAdvanced){
+
+      const prov = parseProvinceJson(el.provJson.value);
+
+      if(prov){
+
+        state.provinceMap = prov;
+
+        if(!(state.selectedProvince in state.provinceMap)){
+
+          state.selectedProvince = "— เลือกจังหวัด —";
+
+          state.selectedDistrict = 0;
+
+        }
+
+      }
+
+    }
+
+    const maxN = Number(el.maxNumber.value);
+
+    b.maxNumber = (Number.isFinite(maxN) && maxN>=1 && maxN<=200) ? Math.floor(maxN) : b.maxNumber;
+
+    b.showNames = (el.showNames.value === "yes");
+
+    const map = parsePartyMap(el.partyMap.value);
+
+    const filtered = {};
+
+    for(const [k,v] of Object.entries(map)){
+
+      const n = Number(k);
+
+      if(n>=1 && n<=b.maxNumber) filtered[String(n)] = v;
+
+    }
+
+    b.partyNames = filtered;
+
+    /* ✅ save province/district too (replaces Apply button) */
+
+    state.selectedProvince = el.provinceSel.value;
+
+    state.selectedDistrict = Number(el.districtSel.value) || 0;
+
+    ensureCounts(b);
+
+    saveState();
+
+    closeSettings();
+
+    render();
+
+  }
+
+  function setActive(which){
+
+    state.active = which;
+
+    saveState();
+
+    render();
+
+  }
+
+  function escapeHtml(s){
+
+    return String(s).replace(/[&<>"']/g, c => ({
+
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+
+    }[c]));
+
+  }
+
+  function render(){
+
+    applyTheme();
+
+    renderSeg();
+
+    renderArea();
+
+    const b = activeBallot();
+
+    ensureCounts(b);
+
+    el.activeBallotName.textContent = b.title;
+
+    el.metaTotalAll.textContent = totalAll(b);
+
+    el.metaTotalValid.textContent = totalValid(b);
+
+    el.metaNoVote.textContent = b.special.novote || 0;
+
+    el.metaInvalid.textContent = b.special.invalid || 0;
+
+    renderTop3();
+
+    renderGrid();
+
+    renderSpecialRow();
+
+    el.btnUndo.disabled = b.history.length === 0;
+
+    el.btnUndo.style.opacity = el.btnUndo.disabled ? 0.55 : 1;
+
+    buildDistrictOptions();
+
+  }
+
+  /* Events */
+
+  el.seg1.addEventListener("click", () => setActive("ballot1"));
+
+  el.seg2.addEventListener("click", () => setActive("ballot2"));
+
+  el.btnUndo.addEventListener("click", undo);
+
+  el.btnReset.addEventListener("click", resetAll);
+
+  el.btnExport.addEventListener("click", async () => copyToClipboard(exportText()));
+
+  el.btnSettings.addEventListener("click", openSettings);
+
+  el.btnCloseSettings.addEventListener("click", closeSettings);
+
+  el.editWhich.addEventListener("change", () => loadSettingsFormFor(el.editWhich.value));
+
+  el.provinceSel.addEventListener("change", () => {
+
+    state.selectedProvince = el.provinceSel.value;
+
+    state.selectedDistrict = 0;
+
+    buildDistrictOptions();
+
+    saveState();
+
+    render();
+
+  });
+
+  el.districtSel.addEventListener("change", () => {
+
+    state.selectedDistrict = Number(el.districtSel.value) || 0;
+
+    saveState();
+
+    render();
+
+  });
+
+  el.toggleAdvanced.addEventListener("click", () => {
+
+    state.showAdvanced = !state.showAdvanced;
+
+    el.advancedBox.classList.toggle("show", state.showAdvanced);
+
+    if(state.showAdvanced){
+
+      el.provJson.value = JSON.stringify(state.provinceMap || START_PROVINCES, null, 2);
+
+    }
+
+    saveState();
+
+  });
+
+  el.btnSaveSettings.addEventListener("click", saveSettings);
+
+  el.popup.addEventListener("click", closePopup);
+
+  /* Init */
+
+  ensureCounts(state.ballot1);
+
+  ensureCounts(state.ballot2);
+
+  if(!Number.isFinite(state.popupMs) || state.popupMs < 200) state.popupMs = 2000;
+
+  saveState();
+
+  buildProvinceOptions();
+
+  render();
+
+})();
+</script>
+</body>
+</html>
